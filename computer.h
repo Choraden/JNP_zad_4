@@ -38,24 +38,27 @@ constexpr uint64_t get_id_hash(const char* str) {
     return res;
 }
 
+template <size_t mem_size, typename value_t>
+class Computer {
+    std:array<value_t, mem_size> arr;
+    std::array<uint64_t, mem_size> mem;
+
+
+public:
+    //TODO
+};
+
 struct Id {
     const uint64_t hash;
     constexpr explicit Id(const char* str) : hash(get_id_hash(str)) {}
 };
 
-template <Id& id>
-struct Lea {
-    static constexpr uint64_t value = id.hash;
+struct Label {
+    const uint64_t
 };
 
-
-template <size_t mem_size, typename value_t>
-class Computer {
-    std::array<value_t, mem_size> mem;
-
-public:
-    //TODO
-};
+template <Id id>
+struct Lea {};
 
 template <typename T>
 struct Mem {};
@@ -98,70 +101,99 @@ class executors {
 
     template <typename Arg>
     struct executor <Mem<Arg>> {
-        static constexpr value_t write(std::array<value_t, mem_size> &mem, value_t new_val) {
-            constexpr value_t id = executor<Arg>::value(mem);
+        static constexpr value_t write(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr, value_t new_val) {
+            constexpr value_t id = executor<Arg>::value(mem, arr);
             static_assert(id >= 0 || id < mem_size, "Out of borders");
-            mem[id] = new_val;
+            arr[id] = new_val;
         }
 
-        static constexpr value_t value(std::array<value_t, mem_size> &mem) {
-            constexpr value_t id = executor<arg>::value(mem);
+        static constexpr value_t value(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+            constexpr value_t id = executor<arg>::value(mem, arr);
             static_assert(id >= 0 || id < mem_size, "Out of borders");
-            return mem[id];
+            return arr[id];
         }
     };
 
     template <value_t val>
     struct executor <Num<val>> {
-        static constexpr value_t value(std::array<value_t, mem_size> &mem) {
+        static constexpr value_t value(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
             return val;
+        }
+    };
+
+    template<Id id>
+    struct executor<Lea<id>> {
+        static constexpr value_t value(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+            for (i = 0; i < mem_size; i++) {
+                if (id.hash == mem[i])
+                    return i;
+            }
         }
     };
 
     template <typename Arg1, typename Arg2>
     struct executor<Add<Arg1, Arg2>> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem) {
-            executor<Arg1>::write(mem, executor<Arg1>::value(mem) + executor<Arg2>::value(mem));
+        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+            executor<Arg1>::write(mem, arr, executor<Arg1>::value(mem, arr) + executor<Arg2>::value(mem, arr));
         }
     };
 
     template <typename Arg1, typename Arg2>
     struct executor<Sub<Arg1, Arg2>> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem) {
-            executor<Arg1>::write(mem, executor<Arg1>::value(mem) - executor<Arg2>::value(mem));
+        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+            executor<Arg1>::write(mem, arr, executor<Arg1>::value(mem, arr) - executor<Arg2>::value(mem, arr));
         }
     };
 
     template <typename Arg1, typename Arg2>
     struct executor<And<Arg1, Arg2>> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem) {
-            executor<Arg1>::write(mem, executor<Arg1>::value(mem) & executor<Arg2>::value(mem));
+        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+            executor<Arg1>::write(mem, arr, executor<Arg1>::value(mem, arr) & executor<Arg2>::value(mem, arr));
         }
     };
 
     template <typename Arg1, typename Arg2>
     struct executor<Or<Arg1, Arg2>> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem) {
-            executor<Arg1>::write(mem, executor<Arg1>::value(mem) | executor<Arg2>::value(mem));
+        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+            executor<Arg1>::write(mem, arr, executor<Arg1>::value(mem, arr) | executor<Arg2>::value(mem, arr));
         }
     };
 
     template <typename Arg1, typename Arg2>
     struct executor<Mov<Arg1, Arg2>> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem) {
-            executor<Arg1>::write(mem, executor<Arg2>::value(mem));
+        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+            executor<Arg1>::write(mem, arr, executor<Arg2>::value(mem, arr));
+        }
+    };
+
+    template <typename Arg1, typename Arg2>
+    struct executor<Cmp<Arg1, Arg2>> {
+        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+            value_t res = executor<Arg1>::value(mem, arr) - executor<Arg2>::value(mem, arr);
+
         }
     };
 
     template <typename Arg>
     struct executor <Not<Arg>> {
-        static constexpr value_t execute(std::array<value_t, mem_size> &mem) {
-            executor<Arg>::write(arr, !(executor<Arg>::value(mem)));
+        static constexpr value_t execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+            executor<Arg>::write(mem, arr, !(executor<Arg>::value(mem, arr)));
         }
     };
 
+    template <typename Arg>
+    struct executor<Inc<Arg>> {
+        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+            executor<Arg1>::write(mem, arr, executor<Arg>::value(mem, arr) + 1);
+        }
+    };
+
+    template <typename Arg>
+    struct executor<Dec<Arg>> {
+        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+            executor<Arg1>::write(mem, arr, executor<Arg>::value(mem, arr) - 1);
+        }
+    };
 };
-
-
 
 #endif //COMPUTER_H
