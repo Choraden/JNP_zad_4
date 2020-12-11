@@ -1,6 +1,8 @@
 #ifndef COMPUTER_H
 #define COMPUTER_H
 
+using Id_t = uint64_t;
+
 constexpr bool is_digit_or_letter(const char c) {
     return ('a' <= c && c <= 'z') ||
            ('A' <= c && c <= 'Z') ||
@@ -24,38 +26,35 @@ constexpr bool check_id(const char* str) {
     return false;
 }
 
-constexpr uint64_t get_id_hash(const char* str) {
+constexpr Id_t Id(const char* str) {
     uint64_t hash_const = 79;
     uint64_t res = 0;
-    if (check_id()) {
+    if (check_id(str)) {
         for (size_t i = 0; i < 6; i++) {
             if (str[i] == '\0')
                 break;
 
-            res = res * hash_const + convert_char(std[i]);
+            res = res * hash_const + convert_char(str[i]);
         }
     }
     return res;
 }
 
-template <size_t mem_size, typename value_t>
-class Computer {
-    std:array<value_t, mem_size> arr;
-    std::array<uint64_t, mem_size> mem;
+typename <size_t mem_size, typename value_t>
+constexpr void set_arth_flags (std::array<uint64_t, mem_size>& helper, value_t res) {
+    helper[mem_size] = ((res == 0) ? 1 : 0); /// Pod indeksem mem_size jest flaga ZF.
+    helper[mem_size + 1] = ((res < 0) ? 1 : 0); /// Pod indeksem mem_size + 1 jest flaga SF.
+}
 
+typename <size_t mem_size, typename value_t>
+constexpr void set_log_flags (std::array<uint64_t, mem_size>& helper, value_t res) {
+    helper[mem_size] = ((res == 0) ? 1 : 0); /// Pod indeksem mem_size jest flaga ZF.
+}
 
-public:
-    //TODO
-};
+template <typename Arg1, typename Arg2>
+struct D {};
 
-struct Id {
-    const uint64_t hash;
-    constexpr explicit Id(const char* str) : hash(get_id_hash(str)) {}
-};
-
-struct Label {
-    const uint64_t
-};
+struct Label {};
 
 template <Id id>
 struct Lea {};
@@ -93,39 +92,44 @@ struct Mov {};
 template <typename Arg1, typename Arg2>
 struct Cmp {};
 
-/// TODO flagi - nie wiem co i jak z nimi.
+
 template <typename value_t, size_t mem_size>
 class executors {
     template <typename operation>
-    struct executor;
+    struct executor {};
+
+
+    struct executor<D<Id_t id, value_t val>> {
+        // TODO + nie wiem czy ten param^ jest ok.
+    };
 
     template <typename Arg>
     struct executor <Mem<Arg>> {
-        static constexpr value_t write(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr, value_t new_val) {
-            constexpr value_t id = executor<Arg>::value(mem, arr);
+        static constexpr value_t write(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper, value_t new_val) {
+            constexpr value_t id = executor<Arg>::value(mem, helper);
             static_assert(id >= 0 || id < mem_size, "Out of borders");
-            arr[id] = new_val;
+            mem[id] = new_val;
         }
 
-        static constexpr value_t value(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
-            constexpr value_t id = executor<arg>::value(mem, arr);
+        static constexpr value_t value(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            constexpr value_t id = executor<Arg>::value(mem, helper);
             static_assert(id >= 0 || id < mem_size, "Out of borders");
-            return arr[id];
+            return mem[id];
         }
     };
 
     template <value_t val>
     struct executor <Num<val>> {
-        static constexpr value_t value(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+        static constexpr value_t value(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
             return val;
         }
     };
 
-    template<Id id>
-    struct executor<Lea<id>> {
-        static constexpr value_t value(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
+    template<Id_t Id>
+    struct executor<Lea<Id>> {
+        static constexpr value_t value(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
             for (i = 0; i < mem_size; i++) {
-                if (id.hash == mem[i])
+                if (Id == helper[i])
                     return i;
             }
         }
@@ -133,67 +137,90 @@ class executors {
 
     template <typename Arg1, typename Arg2>
     struct executor<Add<Arg1, Arg2>> {
-        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
-            executor<Arg1>::write(mem, arr, executor<Arg1>::value(mem, arr) + executor<Arg2>::value(mem, arr));
+        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            executor<Arg1>::write(mem, helper, executor<Arg1>::value(mem, helper) + executor<Arg2>::value(mem, helper));
+            value_t res = executor<Arg1>::value(mem, helper);
+            set_arth_flags(helper, res);
         }
     };
 
     template <typename Arg1, typename Arg2>
     struct executor<Sub<Arg1, Arg2>> {
-        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
-            executor<Arg1>::write(mem, arr, executor<Arg1>::value(mem, arr) - executor<Arg2>::value(mem, arr));
+        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            executor<Arg1>::write(mem, helper, executor<Arg1>::value(mem, helper) - executor<Arg2>::value(mem, helper));
+            value_t res = executor<Arg1>::value(mem, helper);
+            set_arth_flags(helper, res);
         }
     };
 
     template <typename Arg1, typename Arg2>
     struct executor<And<Arg1, Arg2>> {
-        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
-            executor<Arg1>::write(mem, arr, executor<Arg1>::value(mem, arr) & executor<Arg2>::value(mem, arr));
+        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            executor<Arg1>::write(mem, helper, executor<Arg1>::value(mem, helper) & executor<Arg2>::value(mem, helper));
+            value_t res = executor<Arg1>::value(mem, helper);
+            set_log_flags(helper, res);
         }
     };
 
     template <typename Arg1, typename Arg2>
     struct executor<Or<Arg1, Arg2>> {
-        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
-            executor<Arg1>::write(mem, arr, executor<Arg1>::value(mem, arr) | executor<Arg2>::value(mem, arr));
+        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            executor<Arg1>::write(mem, helper, executor<Arg1>::value(mem, helper) | executor<Arg2>::value(mem, helper));
+            value_t res = executor<Arg1>::value(mem, helper);
+            set_log_flags(helper, res);
         }
     };
 
     template <typename Arg1, typename Arg2>
     struct executor<Mov<Arg1, Arg2>> {
-        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
-            executor<Arg1>::write(mem, arr, executor<Arg2>::value(mem, arr));
+        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            executor<Arg1>::write(mem, helper, executor<Arg2>::value(mem, helper));
         }
     };
 
     template <typename Arg1, typename Arg2>
     struct executor<Cmp<Arg1, Arg2>> {
-        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
-            value_t res = executor<Arg1>::value(mem, arr) - executor<Arg2>::value(mem, arr);
-
+        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            value_t res = executor<Arg1>::value(mem, helper) - executor<Arg2>::value(mem, helper);
+            set_arth_flags(helper, res);
         }
     };
 
     template <typename Arg>
     struct executor <Not<Arg>> {
-        static constexpr value_t execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
-            executor<Arg>::write(mem, arr, !(executor<Arg>::value(mem, arr)));
+        static constexpr value_t execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            executor<Arg>::write(mem, helper, !(executor<Arg>::value(mem, helper)));
+            value_t res = executor<Arg1>::value(mem, helper);
+            set_log_flags(helper, res);
         }
     };
 
     template <typename Arg>
     struct executor<Inc<Arg>> {
-        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
-            executor<Arg1>::write(mem, arr, executor<Arg>::value(mem, arr) + 1);
+        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            executor<Arg1>::write(mem, helper, executor<Arg>::value(mem, helper) + 1);
+            value_t res = executor<Arg1>::value(mem, helper);
+            set_arth_flags(helper, res);
         }
     };
 
     template <typename Arg>
     struct executor<Dec<Arg>> {
-        static constexpr void execute(std::array<uint64_t, mem_size> &mem, std::array<value_t, mem_size> &arr) {
-            executor<Arg1>::write(mem, arr, executor<Arg>::value(mem, arr) - 1);
+        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            executor<Arg1>::write(mem, helper, executor<Arg>::value(mem, helper) - 1);
+            value_t res = executor<Arg1>::value(mem, helper);
+            set_arth_flags(helper, res);
         }
     };
+};
+
+template <size_t mem_size, typename value_t>
+class Computer {
+    std:array<value_t, mem_size> mem;
+    std::array<uint64_t, mem_size + 2> helper;
+
+public:
+    //TODO
 };
 
 #endif //COMPUTER_H
