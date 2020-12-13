@@ -1,3 +1,5 @@
+// Hubert Grochowski
+// Rafał Szulc
 #ifndef COMPUTER_H
 #define COMPUTER_H
 
