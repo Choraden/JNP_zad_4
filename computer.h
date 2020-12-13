@@ -1,5 +1,7 @@
 #ifndef COMPUTER_H
 #define COMPUTER_H
+#include <cstdlib>
+#include <array>
 
 using Id_t = uint64_t;
 
@@ -9,7 +11,7 @@ constexpr bool is_digit_or_letter(const char c) {
            ('0' <= c && c <= '9');
 }
 
-constexpr uint64_t convert_char(const char c) {
+constexpr uint64_t convert_char(char c) {
     if ('A' <= c && c <= 'Z')
         c = c - 'A' + 'a';
     return c;
@@ -30,7 +32,7 @@ constexpr bool check_id(const char* str) {
 constexpr Id_t Id(const char* str) {
     uint64_t hash_const = 79;
     uint64_t res = 0;
-    static_assert(check_id(str) == true, "Incorrect Id");
+    assert(check_id(str) == true);
 
     for (size_t i = 0; i < 6; i++) {
         if (str[i] == '\0')
@@ -42,19 +44,23 @@ constexpr Id_t Id(const char* str) {
     return res;
 }
 
-typename <size_t mem_size, typename value_t>
+template <size_t mem_size, typename value_t>
 constexpr void set_arth_flags (std::array<uint64_t, mem_size>& helper, value_t res) {
     helper[mem_size] = ((res == 0) ? 1 : 0); /// Pod indeksem mem_size jest flaga ZF.
     helper[mem_size + 1] = ((res < 0) ? 1 : 0); /// Pod indeksem mem_size + 1 jest flaga SF.
 }
 
-typename <size_t mem_size, typename value_t>
+template <size_t mem_size, typename value_t>
 constexpr void set_log_flags (std::array<uint64_t, mem_size>& helper, value_t res) {
     helper[mem_size] = ((res == 0) ? 1 : 0); /// Pod indeksem mem_size jest flaga ZF.
 }
 
+
+template <typename... Args>
+struct Program {};
+
 template <typename Arg1, typename Arg2>
-struct D {};
+struct  D {};
 
 template <Id_t id>
 struct Lea {};
@@ -62,7 +68,7 @@ struct Lea {};
 template <typename T>
 struct Mem {};
 
-template <typename T>
+template <auto T>
 struct Num {};
 
 template <typename T>
@@ -106,7 +112,7 @@ struct Js {};
 
 template <typename value_t, size_t mem_size, typename... Rest>
 class Executors {
-    template <typename operation>
+    template <typename operation, typename... Tail>
     struct executor {};
 
     template <typename Arg>
@@ -132,9 +138,9 @@ class Executors {
     };
 
     template <Id_t id>
-    struct executor<Lea<Id>> {
+    struct executor<Lea<id>> {
         static constexpr value_t value(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
-            for (i = 0; i < mem_size; i++) {
+            for (size_t i = 0; i < mem_size; i++) {
                 if (id == helper[i])
                     return i;
             }
@@ -152,7 +158,7 @@ class Executors {
                 set_arth_flags(helper, res);
             }
             else {
-                static_assert(Tail.size() != 0, "Jump to nowhere.");
+                static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -165,11 +171,13 @@ class Executors {
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
-                executor<Arg1>::write(mem, helper, executor<Arg1>::value(mem, helper) - executor<Arg2>::value(mem, helper));
+                executor<Arg1>::write(mem, helper,
+                                      executor<Arg1>::value(mem, helper) - executor<Arg2>::value(mem, helper));
                 value_t res = executor<Arg1>::value(mem, helper);
                 set_arth_flags(helper, res);
+            }
             else {
-                static_assert(Tail.size() != 0, "Jump to nowhere.");
+                static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -182,11 +190,13 @@ class Executors {
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
-                executor<Arg1>::write(mem, helper, executor<Arg1>::value(mem, helper) & executor<Arg2>::value(mem, helper));
+                executor<Arg1>::write(mem, helper,
+                                      executor<Arg1>::value(mem, helper) & executor<Arg2>::value(mem, helper));
                 value_t res = executor<Arg1>::value(mem, helper);
                 set_log_flags(helper, res);
+            }
             else {
-                static_assert(Tail.size() != 0, "Jump to nowhere.");
+                static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -199,11 +209,13 @@ class Executors {
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
-                executor<Arg1>::write(mem, helper, executor<Arg1>::value(mem, helper) | executor<Arg2>::value(mem, helper));
+                executor<Arg1>::write(mem, helper,
+                                      executor<Arg1>::value(mem, helper) | executor<Arg2>::value(mem, helper));
                 value_t res = executor<Arg1>::value(mem, helper);
                 set_log_flags(helper, res);
+            }
             else {
-                static_assert(Tail.size() != 0, "Jump to nowhere.");
+                static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -217,8 +229,9 @@ class Executors {
 
             if (protection == false) {
                 executor<Arg1>::write(mem, helper, executor<Arg2>::value(mem, helper));
+            }
             else {
-                static_assert(Tail.size() != 0, "Jump to nowhere.");
+                static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -233,8 +246,9 @@ class Executors {
             if (protection == false) {
                 value_t res = executor<Arg1>::value(mem, helper) - executor<Arg2>::value(mem, helper);
                 set_arth_flags(helper, res);
+            }
             else {
-                static_assert(Tail.size() != 0, "Jump to nowhere.");
+                static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -248,10 +262,11 @@ class Executors {
 
             if (protection == false) {
                 executor<Arg>::write(mem, helper, !(executor<Arg>::value(mem, helper)));
-                value_t res = executor<Arg1>::value(mem, helper);
+                value_t res = executor<Arg>::value(mem, helper);
                 set_log_flags(helper, res);
+            }
             else {
-                static_assert(Tail.size() != 0, "Jump to nowhere.");
+                static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -264,11 +279,12 @@ class Executors {
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
-                executor<Arg1>::write(mem, helper, executor<Arg>::value(mem, helper) + 1);
-                value_t res = executor<Arg1>::value(mem, helper);
+                executor<Arg>::write(mem, helper, executor<Arg>::value(mem, helper) + 1);
+                value_t res = executor<Arg>::value(mem, helper);
                 set_arth_flags(helper, res);
+            }
             else {
-                static_assert(Tail.size() != 0, "Jump to nowhere.");
+                static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -281,21 +297,28 @@ class Executors {
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
-                executor<Arg1>::write(mem, helper, executor<Arg>::value(mem, helper) - 1);
-                value_t res = executor<Arg1>::value(mem, helper);
+                executor<Arg>::write(mem, helper, executor<Arg>::value(mem, helper) - 1);
+                value_t res = executor<Arg>::value(mem, helper);
                 set_arth_flags(helper, res);
+            }
             else {
-                static_assert(Tail.size() != 0, "Jump to nowhere.");
+                static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
         }
     };
 
-    template<size_t it, Id_t id, typename N, typename... Tail>
-    struct Declarations <it, D<id, N>, Tail...> {};
+    template<typename... Tail>
+    struct Declarations {};
 
-    template <size_t it, Id_t id, value_t val, typename... Tail>
+
+    template<size_t it, Tail...>
+    struct Declarations<it, Tail...> {
+
+    };
+
+    template <size_t it, Id_t id, value_t val, Tail...>
     struct Declarations <it, D<id, Num<val>>, Tail...> {
         static constexpr void declare(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
             static_assert(it < mem_size, "Out of borders");
@@ -306,7 +329,7 @@ class Executors {
     };
 
     template<Id_t id, typename... Tail>
-    struct executor<Jump<id>, Tail...> {
+    struct executor<Jmp<id>, Tail...> {
         static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
@@ -366,7 +389,7 @@ class Executors {
                 executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
             }
             else {
-                static_assert(it > last, "Infinite jumping.");
+                assert(it > last);
                 executor<Tail...>::execute(mem, helper, false, wanted_id, last, it + 1);
             }
         }
@@ -382,7 +405,9 @@ class Executors {
     };
 
 public:
-    static constexpr mem execution() {
+    template<typename value_t, size_t mem_size, typename... Rest>
+    static constexpr std::array<value_t, mem_size> execution(std::array<value_t, mem_size>& mem,
+                                                             std::array<Id_t, mem_size + 2>& helper) {
         size_t beginning = 0;
         Declarations<beginning, Rest...>::declare(mem, helper);
         Id_t id_wanted = 0;
@@ -396,23 +421,23 @@ public:
 
 template <size_t mem_size, typename value_t>
 class Computer {
-    std:array<value_t, mem_size> mem;
+    std::array<value_t, mem_size> mem;
     std::array<Id_t, mem_size + 2> helper;
 
-    template <typename Instructions>
+    template <typename W>
     struct Loading {};
 
-    template <typename Instruction, typename ... Rest>
-    struct Loading <Instruction, Rest ...> {
-        static constexpr mem execution() {
-            return Executors<value_t, mem_size, Rest...>::execution();
+    template <typename ... List>
+    struct Loading <Program<List...>> {
+        static constexpr std::array<value_t, mem_size> execution() {
+            return Executors<value_t, mem_size, List...>::execution(mem, helper);
         }
-    }
+    };
 
 public:
-    template <typename Instructions>
-    static constexpr mem boot() {
-        return Loading<Instructions>::execution();
+    template <typename W>
+    static constexpr std::array<value_t, mem_size> boot() {
+        return Loading<W>::execution();
     }  
 };
 
