@@ -5,57 +5,6 @@
 
 using Id_t = uint64_t;
 
-constexpr bool is_digit_or_letter(const char c) {
-    return ('a' <= c && c <= 'z') ||
-           ('A' <= c && c <= 'Z') ||
-           ('0' <= c && c <= '9');
-}
-
-constexpr uint64_t convert_char(char c) {
-    if ('A' <= c && c <= 'Z')
-        c = c - 'A' + 'a';
-    return c;
-}
-
-constexpr bool check_id(const char* str) {
-    for (size_t i = 0; i < 7; i++) {
-        if (str[i] == '\0')
-            return i > 0;
-
-        if (!is_digit_or_letter(str[i]))
-            return false;
-    }
-
-    return true;
-}
-
-constexpr Id_t Id(const char* str) {
-    uint64_t hash_const = 79;
-    uint64_t res = 0;
-    assert(check_id(str) == true);
-
-    for (size_t i = 0; i < 6; i++) {
-        if (str[i] == '\0')
-            break;
-
-        res = res * hash_const + convert_char(str[i]);
-    }
-
-    return res;
-}
-
-template <size_t mem_size, typename value_t>
-constexpr void set_arth_flags (std::array<uint64_t, mem_size>& helper, value_t res) {
-    helper[mem_size] = (res == 0); /// Pod indeksem mem_size jest flaga ZF.
-    helper[mem_size + 1] = (res < 0); /// Pod indeksem mem_size + 1 jest flaga SF.
-}
-
-template <size_t mem_size, typename value_t>
-constexpr void set_log_flags (std::array<uint64_t, mem_size>& helper, value_t res) {
-    helper[mem_size] = (res == 0); /// Pod indeksem mem_size jest flaga ZF.
-}
-
-
 template <typename... Args>
 struct Program {};
 
@@ -110,37 +59,93 @@ struct Jz {};
 template <Id_t id>
 struct Js {};
 
+constexpr bool is_digit_or_letter(const char c) {
+    return ('a' <= c && c <= 'z') ||
+           ('A' <= c && c <= 'Z') ||
+           ('0' <= c && c <= '9');
+}
+
+constexpr uint64_t convert_char(char c) {
+    if ('A' <= c && c <= 'Z')
+        c = c - 'A' + 'a';
+    return c;
+}
+
+constexpr bool check_id(const char* str) {
+    for (size_t i = 0; i < 7; i++) {
+        if (str[i] == '\0')
+            return i > 0;
+
+        if (!is_digit_or_letter(str[i]))
+            return false;
+    }
+
+    return false;
+}
+
+constexpr Id_t Id(const char* str) {
+    uint64_t hash_const = 79;
+    uint64_t res = 0;
+    if(!check_id(str)) {
+        throw "Invalid ID.";
+    }
+
+    for (size_t i = 0; i < 6; i++) {
+        if (str[i] == '\0')
+            break;
+
+        res = res * hash_const + convert_char(str[i]);
+    }
+    return res;
+}
+
 template <typename value_t, size_t mem_size, typename... Rest>
 class Executors {
+    using mem_t = std::array<value_t, mem_size>;
+    using help_t = std::array<uint64_t, mem_size + 2>;
+
+    constexpr static void set_arth_flags (help_t& helper, value_t res) {
+        helper[mem_size] = (res == 0); /// Pod indeksem mem_size jest flaga ZF.
+        helper[mem_size + 1] = (res < 0); /// Pod indeksem mem_size + 1 jest flaga SF.
+    }
+
+    constexpr static void set_log_flags (help_t& helper, value_t res) {
+        helper[mem_size] = (res == 0); /// Pod indeksem mem_size jest flaga ZF.
+    }
+
     template <typename operation, typename... Tail>
     struct executor {};
 
-
     template <typename Arg>
     struct executor <Mem<Arg>> {
-        static constexpr value_t write(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper, value_t new_val) {
-            constexpr value_t id = executor<Arg>::value(mem, helper);
-            static_assert(id >= 0 || id < mem_size, "Out of borders");
+
+        static constexpr Id_t get_id(mem_t &mem, help_t &helper) {
+            return executor<Arg>::value(mem, helper);
+        }
+
+        static constexpr void write(mem_t &mem, help_t &helper, value_t new_val) {
+            value_t id = executor<Arg>::get_id(mem, helper);
+         //   static_assert(id >= 0 || id < mem_size, "Out of borders");
             mem[id] = new_val;
         }
 
-        static constexpr value_t value(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
-            constexpr value_t id = executor<Arg>::value(mem, helper);
-            static_assert(id >= 0 || id < mem_size, "Out of borders");
+        static constexpr value_t value(mem_t &mem, help_t &helper) {
+            value_t id = executor<Arg>::get_id(mem, helper);
+           // static_assert(id >= 0 || id < mem_size, "Out of borders");
             return mem[id];
         }
     };
 
     template <value_t val>
     struct executor <Num<val>> {
-        static constexpr value_t value(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+        static constexpr value_t value(mem_t &mem, help_t &helper) {
             return val;
         }
     };
 
     template <Id_t id>
     struct executor<Lea<id>> {
-        static constexpr value_t value(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+        static constexpr value_t value(mem_t &mem, help_t &helper) {
             for (size_t i = 0; i < mem_size; i++) {
                 if (id == helper[i])
                     return i;
@@ -150,16 +155,15 @@ class Executors {
 
     template <typename Arg1, typename Arg2, typename... Tail>
     struct executor<Add<Arg1, Arg2>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
-
             if (protection == false) {
                 executor<Arg1>::write(mem, helper, executor<Arg1>::value(mem, helper) + executor<Arg2>::value(mem, helper));
                 value_t res = executor<Arg1>::value(mem, helper);
                 set_arth_flags(helper, res);
             }
             else {
-                static_assert(it != mem_size - 1, "Jmp to nowhere.");
+               // static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -168,7 +172,7 @@ class Executors {
 
     template <typename Arg1, typename Arg2, typename... Tail>
     struct executor<Sub<Arg1, Arg2>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
@@ -178,7 +182,7 @@ class Executors {
                 set_arth_flags(helper, res);
             }
             else {
-                static_assert(it != mem_size - 1, "Jmp to nowhere.");
+                //static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -187,7 +191,7 @@ class Executors {
 
     template <typename Arg1, typename Arg2, typename... Tail>
     struct executor<And<Arg1, Arg2>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
@@ -197,7 +201,7 @@ class Executors {
                 set_log_flags(helper, res);
             }
             else {
-                static_assert(it != mem_size - 1, "Jmp to nowhere.");
+              //  static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -206,7 +210,7 @@ class Executors {
 
     template <typename Arg1, typename Arg2, typename... Tail>
     struct executor<Or<Arg1, Arg2>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
@@ -216,7 +220,7 @@ class Executors {
                 set_log_flags(helper, res);
             }
             else {
-                static_assert(it != mem_size - 1, "Jmp to nowhere.");
+               // static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -225,23 +229,24 @@ class Executors {
 
     template <typename Arg1, typename Arg2, typename... Tail>
     struct executor<Mov<Arg1, Arg2>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
-                executor<Arg1>::write(mem, helper, executor<Arg2>::value(mem, helper));
+                Id_t current_id = executor<Arg1>::get_id(mem, helper);
+                mem[current_id] = executor<Arg2>::value(mem, helper);
             }
             else {
-                static_assert(it != mem_size - 1, "Jmp to nowhere.");
+               // static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
-            executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+            //executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
         }
     };
 
     template <typename Arg1, typename Arg2, typename... Tail>
     struct executor<Cmp<Arg1, Arg2>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
@@ -258,7 +263,7 @@ class Executors {
 
     template <typename Arg, typename... Tail>
     struct executor<Not<Arg>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
@@ -276,7 +281,7 @@ class Executors {
 
     template <typename Arg, typename... Tail>
     struct executor<Inc<Arg>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
@@ -294,7 +299,7 @@ class Executors {
 
     template <typename Arg, typename... Tail>
     struct executor<Dec<Arg>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
@@ -312,7 +317,7 @@ class Executors {
 
     template<Id_t id, typename... Tail>
     struct executor<Jmp<id>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
@@ -326,7 +331,7 @@ class Executors {
 
     template<Id_t id, typename... Tail>
     struct executor<Jz<id>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (helper[mem_size] == 0) {
@@ -345,7 +350,7 @@ class Executors {
 
     template<Id_t id, typename... Tail>
     struct executor<Js<id>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (helper[mem_size + 1] == 0) {
@@ -364,7 +369,7 @@ class Executors {
 
     template<Id_t id, typename... Tail>
     struct executor<Label<id>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false || (protection == true && id != wanted_id)) {
@@ -379,7 +384,7 @@ class Executors {
 
     template<Id_t id, typename N, typename... Tail>
     struct executor<D<id, N>, Tail...> {
-        static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
+        static constexpr void execute(mem_t &mem, help_t &helper,
             bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -388,19 +393,19 @@ class Executors {
 
     template <size_t it, typename ... Tail>
     struct Declarations {
-        static constexpr void declare(std::array<value_t, mem_size>&, std::array<uint64_t, mem_size> &) {}
+        static constexpr void declare(mem_t&, help_t &) {}
     };
 
     template <size_t it, typename R, typename ... Tail>
     struct Declarations <it, R, Tail...> {
-        static constexpr void declare(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+        static constexpr void declare(mem_t &mem, help_t &helper) {
             Declarations <it, Tail...>::declare(mem, helper);
         }
     };
 
     template <size_t it, Id_t id, value_t val, typename ... Tail>
     struct Declarations <it, D<id, Num<val>>, Tail...> {
-        static constexpr void declare(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+        static constexpr void declare(mem_t &mem, help_t &helper) {
             static_assert(it < mem_size, "Out of borders");
             mem[it] = executor<Num<val>>::value(mem, helper);
             helper[it] = id;
@@ -409,15 +414,14 @@ class Executors {
     };
 
 public:
-
-    static constexpr std::array<value_t, mem_size> execution() {
-        std::array<value_t, mem_size> mem {0};
-        std::array<Id_t, mem_size + 2> helper {0};
-        Declarations<(uint32_t) 0, Rest...>::declare(mem, helper);
+    static constexpr mem_t execution() {
+        mem_t mem {0};
+        help_t helper {0};
+        Declarations<(uint64_t) 0, Rest...>::declare(mem, helper);
         Id_t id_wanted = 0;
         size_t last = 0;
         size_t it = 0;
-        //executor<Rest...>::execute(mem, helper, false, id_wanted, last, it);
+        executor<Rest...>::execute(mem, helper, false, id_wanted, last, it);
 
         return mem;
     }
@@ -425,19 +429,21 @@ public:
 
 template <size_t mem_size, typename value_t>
 class Computer {
+    using mem_t = std::array<value_t, mem_size>;
+    using help_t = std::array<uint64_t, mem_size + 2>;
     template <typename W>
     struct Loading {};
 
     template <typename ... List>
     struct Loading <Program<List...>> {
-        static constexpr std::array<value_t, mem_size> start() {
+        static constexpr mem_t start() {
             return Executors<value_t, mem_size, List...>::execution();
         }
     };
 
 public:
     template <typename W>
-    static constexpr std::array<value_t, mem_size> boot() {
+    static constexpr mem_t boot() {
         return Loading<W>::start();
     }  
 };
