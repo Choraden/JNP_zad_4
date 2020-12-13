@@ -46,20 +46,20 @@ constexpr Id_t Id(const char* str) {
 
 template <size_t mem_size, typename value_t>
 constexpr void set_arth_flags (std::array<uint64_t, mem_size>& helper, value_t res) {
-    helper[mem_size] = ((res == 0) ? 1 : 0); /// Pod indeksem mem_size jest flaga ZF.
-    helper[mem_size + 1] = ((res < 0) ? 1 : 0); /// Pod indeksem mem_size + 1 jest flaga SF.
+    helper[mem_size] = (res == 0); /// Pod indeksem mem_size jest flaga ZF.
+    helper[mem_size + 1] = (res < 0); /// Pod indeksem mem_size + 1 jest flaga SF.
 }
 
 template <size_t mem_size, typename value_t>
 constexpr void set_log_flags (std::array<uint64_t, mem_size>& helper, value_t res) {
-    helper[mem_size] = ((res == 0) ? 1 : 0); /// Pod indeksem mem_size jest flaga ZF.
+    helper[mem_size] = (res == 0); /// Pod indeksem mem_size jest flaga ZF.
 }
 
 
 template <typename... Args>
 struct Program {};
 
-template <typename Arg1, typename Arg2>
+template <Id_t id, typename Arg>
 struct  D {};
 
 template <Id_t id>
@@ -114,6 +114,7 @@ template <typename value_t, size_t mem_size, typename... Rest>
 class Executors {
     template <typename operation, typename... Tail>
     struct executor {};
+
 
     template <typename Arg>
     struct executor <Mem<Arg>> {
@@ -309,23 +310,6 @@ class Executors {
         }
     };
 
-    template <size_t it, typename R, typename ... Tail>
-    struct Declarations <it, R, Tail...> {
-        static constexpr void declare(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
-            Declarations <it, Tail...>::declare(mem, helper);
-        }
-    };
-
-    template <size_t it, Id_t id, value_t val, typename ... Tail>
-    struct Declarations <it, D<id, Num<val>>, Tail...> {
-        static constexpr void declare(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
-            static_assert(it < mem_size, "Out of borders");
-            mem[it] = executor<Arg>::value(mem, helper);
-            helper[it] = id;
-            Declarations <it + 1, Tail...>::declare(mem, helper);
-        }
-    };
-
     template<Id_t id, typename... Tail>
     struct executor<Jmp<id>, Tail...> {
         static constexpr void execute(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper,
@@ -402,16 +386,38 @@ class Executors {
         }
     };
 
+    template <size_t it, typename ... Tail>
+    struct Declarations {
+        static constexpr void declare(std::array<value_t, mem_size>&, std::array<uint64_t, mem_size> &) {}
+    };
+
+    template <size_t it, typename R, typename ... Tail>
+    struct Declarations <it, R, Tail...> {
+        static constexpr void declare(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            Declarations <it, Tail...>::declare(mem, helper);
+        }
+    };
+
+    template <size_t it, Id_t id, value_t val, typename ... Tail>
+    struct Declarations <it, D<id, Num<val>>, Tail...> {
+        static constexpr void declare(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            static_assert(it < mem_size, "Out of borders");
+            mem[it] = executor<Num<val>>::value(mem, helper);
+            helper[it] = id;
+            Declarations <it + 1, Tail...>::declare(mem, helper);
+        }
+    };
+
 public:
-    template<typename value_t, size_t mem_size, typename... Rest>
-    static constexpr std::array<value_t, mem_size> execution(std::array<value_t, mem_size>& mem,
-                                                             std::array<Id_t, mem_size + 2>& helper) {
-        size_t beginning = 0;
-        Declarations<beginning, Rest...>::declare(mem, helper);
+
+    static constexpr std::array<value_t, mem_size> execution() {
+        std::array<value_t, mem_size> mem {0};
+        std::array<Id_t, mem_size + 2> helper {0};
+        Declarations<(uint32_t) 0, Rest...>::declare(mem, helper);
         Id_t id_wanted = 0;
         size_t last = 0;
         size_t it = 0;
-        executor<Rest...>::execute(mem, helper, false, id_wanted, last, it);
+        //executor<Rest...>::execute(mem, helper, false, id_wanted, last, it);
 
         return mem;
     }
@@ -419,23 +425,20 @@ public:
 
 template <size_t mem_size, typename value_t>
 class Computer {
-    std::array<value_t, mem_size> mem;
-    std::array<Id_t, mem_size + 2> helper;
-
     template <typename W>
     struct Loading {};
 
     template <typename ... List>
     struct Loading <Program<List...>> {
-        static constexpr std::array<value_t, mem_size> execution() {
-            return Executors<value_t, mem_size, List...>::execution(mem, helper);
+        static constexpr std::array<value_t, mem_size> start() {
+            return Executors<value_t, mem_size, List...>::execution();
         }
     };
 
 public:
     template <typename W>
     static constexpr std::array<value_t, mem_size> boot() {
-        return Loading<W>::execution();
+        return Loading<W>::start();
     }  
 };
 
