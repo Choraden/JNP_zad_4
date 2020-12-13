@@ -105,12 +105,12 @@ class Executors {
     using help_t = std::array<uint64_t, mem_size + 2>;
 
     constexpr static void set_arth_flags (help_t& helper, value_t res) {
-        helper[mem_size] = (res == 0); /// Pod indeksem mem_size jest flaga ZF.
-        helper[mem_size + 1] = (res < 0); /// Pod indeksem mem_size + 1 jest flaga SF.
+        helper[mem_size] = (res == 0); // Pod indeksem mem_size jest flaga ZF.
+        helper[mem_size + 1] = (res < 0); // Pod indeksem mem_size + 1 jest flaga SF.
     }
 
     constexpr static void set_log_flags (help_t& helper, value_t res) {
-        helper[mem_size] = (res == 0); /// Pod indeksem mem_size jest flaga ZF.
+        helper[mem_size] = (res == 0); // Pod indeksem mem_size jest flaga ZF.
     }
 
     template <typename operation, typename... Tail>
@@ -124,19 +124,21 @@ class Executors {
         }
 
         static constexpr void write(mem_t &mem, help_t &helper, value_t new_val) {
-            value_t id = executor<Arg>::get_id(mem, helper);
-         //   static_assert(id >= 0 || id < mem_size, "Out of borders");
+            value_t id = executor<Arg>::value(mem, helper);
+            if (id < 0 || id >= mem_size)
+                throw ""Out of borders"";
             mem[id] = new_val;
         }
 
         static constexpr value_t value(mem_t &mem, help_t &helper) {
-            value_t id = executor<Arg>::get_id(mem, helper);
-           // static_assert(id >= 0 || id < mem_size, "Out of borders");
+            value_t id = executor<Arg>::value(mem, helper);
+            if (id < 0 || id >= mem_size)
+                throw ""Out of borders"";
             return mem[id];
         }
     };
 
-    template <value_t val>
+    template <int val>
     struct executor <Num<val>> {
         static constexpr value_t value(mem_t &mem, help_t &helper) {
             return val;
@@ -156,14 +158,11 @@ class Executors {
     template <typename Arg1, typename Arg2, typename... Tail>
     struct executor<Add<Arg1, Arg2>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
             if (protection == false) {
                 executor<Arg1>::write(mem, helper, executor<Arg1>::value(mem, helper) + executor<Arg2>::value(mem, helper));
                 value_t res = executor<Arg1>::value(mem, helper);
                 set_arth_flags(helper, res);
-            }
-            else {
-               // static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -173,16 +172,13 @@ class Executors {
     template <typename Arg1, typename Arg2, typename... Tail>
     struct executor<Sub<Arg1, Arg2>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
                 executor<Arg1>::write(mem, helper,
                                       executor<Arg1>::value(mem, helper) - executor<Arg2>::value(mem, helper));
                 value_t res = executor<Arg1>::value(mem, helper);
                 set_arth_flags(helper, res);
-            }
-            else {
-                //static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -192,16 +188,13 @@ class Executors {
     template <typename Arg1, typename Arg2, typename... Tail>
     struct executor<And<Arg1, Arg2>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
                 executor<Arg1>::write(mem, helper,
                                       executor<Arg1>::value(mem, helper) & executor<Arg2>::value(mem, helper));
                 value_t res = executor<Arg1>::value(mem, helper);
                 set_log_flags(helper, res);
-            }
-            else {
-              //  static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -211,16 +204,13 @@ class Executors {
     template <typename Arg1, typename Arg2, typename... Tail>
     struct executor<Or<Arg1, Arg2>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
                 executor<Arg1>::write(mem, helper,
                                       executor<Arg1>::value(mem, helper) | executor<Arg2>::value(mem, helper));
                 value_t res = executor<Arg1>::value(mem, helper);
                 set_log_flags(helper, res);
-            }
-            else {
-               // static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -230,31 +220,25 @@ class Executors {
     template <typename Arg1, typename Arg2, typename... Tail>
     struct executor<Mov<Arg1, Arg2>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
                 Id_t current_id = executor<Arg1>::get_id(mem, helper);
                 mem[current_id] = executor<Arg2>::value(mem, helper);
             }
-            else {
-               // static_assert(it != mem_size - 1, "Jmp to nowhere.");
-            }
 
-            //executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+            executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
         }
     };
 
     template <typename Arg1, typename Arg2, typename... Tail>
     struct executor<Cmp<Arg1, Arg2>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
                 value_t res = executor<Arg1>::value(mem, helper) - executor<Arg2>::value(mem, helper);
                 set_arth_flags(helper, res);
-            }
-            else {
-                static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -264,15 +248,12 @@ class Executors {
     template <typename Arg, typename... Tail>
     struct executor<Not<Arg>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
                 executor<Arg>::write(mem, helper, !(executor<Arg>::value(mem, helper)));
                 value_t res = executor<Arg>::value(mem, helper);
                 set_log_flags(helper, res);
-            }
-            else {
-                static_assert(it != mem_size - 1, "Jmp to nowhere.");
             }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -282,7 +263,7 @@ class Executors {
     template <typename Arg, typename... Tail>
     struct executor<Inc<Arg>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
                 executor<Arg>::write(mem, helper, executor<Arg>::value(mem, helper) + 1);
@@ -290,8 +271,6 @@ class Executors {
                 set_arth_flags(helper, res);
             }
             else {
-                static_assert(it != mem_size - 1, "Jmp to nowhere.");
-            }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
         }
@@ -300,7 +279,7 @@ class Executors {
     template <typename Arg, typename... Tail>
     struct executor<Dec<Arg>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
                 executor<Arg>::write(mem, helper, executor<Arg>::value(mem, helper) - 1);
@@ -308,8 +287,6 @@ class Executors {
                 set_arth_flags(helper, res);
             }
             else {
-                static_assert(it != mem_size - 1, "Jmp to nowhere.");
-            }
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
         }
@@ -318,7 +295,7 @@ class Executors {
     template<Id_t id, typename... Tail>
     struct executor<Jmp<id>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false) {
                 executor<Rest...>::execute(mem, helper, true, id, it, 0);
@@ -332,7 +309,7 @@ class Executors {
     template<Id_t id, typename... Tail>
     struct executor<Jz<id>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (helper[mem_size] == 0) {
                 executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -351,7 +328,7 @@ class Executors {
     template<Id_t id, typename... Tail>
     struct executor<Js<id>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (helper[mem_size + 1] == 0) {
                 executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
@@ -370,13 +347,14 @@ class Executors {
     template<Id_t id, typename... Tail>
     struct executor<Label<id>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             if (protection == false || (protection == true && id != wanted_id)) {
                 executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
             }
             else {
-                assert(it > last);
+                if (it < last)
+                    throw("Infinite jumping.");
                 executor<Tail...>::execute(mem, helper, false, wanted_id, last, it + 1);
             }
         }
@@ -385,7 +363,7 @@ class Executors {
     template<Id_t id, typename N, typename... Tail>
     struct executor<D<id, N>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-            bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
         }
@@ -406,7 +384,9 @@ class Executors {
     template <size_t it, Id_t id, value_t val, typename ... Tail>
     struct Declarations <it, D<id, Num<val>>, Tail...> {
         static constexpr void declare(mem_t &mem, help_t &helper) {
-            static_assert(it < mem_size, "Out of borders");
+            if (it >= mem_size)
+                throw("Out of borders");
+
             mem[it] = executor<Num<val>>::value(mem, helper);
             helper[it] = id;
             Declarations <it + 1, Tail...>::declare(mem, helper);
@@ -445,7 +425,7 @@ public:
     template <typename W>
     static constexpr mem_t boot() {
         return Loading<W>::start();
-    }  
+    }
 };
 
 #endif //COMPUTER_H
