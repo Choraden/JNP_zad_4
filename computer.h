@@ -309,16 +309,14 @@ class Executors {
         }
     };
 
-    template<typename... Tail>
-    struct Declarations {};
-
-
-    template<size_t it, Tail...>
-    struct Declarations<it, Tail...> {
-
+    template <size_t it, typename R, typename ... Tail>
+    struct Declarations <it, R, Tail...> {
+        static constexpr void declare(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
+            Declarations <it, Tail...>::declare(mem, helper);
+        }
     };
 
-    template <size_t it, Id_t id, value_t val, Tail...>
+    template <size_t it, Id_t id, value_t val, typename ... Tail>
     struct Declarations <it, D<id, Num<val>>, Tail...> {
         static constexpr void declare(std::array<value_t, mem_size> &mem, std::array<uint64_t, mem_size> &helper) {
             static_assert(it < mem_size, "Out of borders");
