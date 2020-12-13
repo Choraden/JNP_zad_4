@@ -59,34 +59,36 @@ struct Jz {};
 template <Id_t id>
 struct Js {};
 
-constexpr bool is_digit_or_letter(const char c) {
-    return ('a' <= c && c <= 'z') ||
-           ('A' <= c && c <= 'Z') ||
-           ('0' <= c && c <= '9');
-}
-
-constexpr uint64_t convert_char(char c) {
-    if ('A' <= c && c <= 'Z')
-        c = c - 'A' + 'a';
-    return c;
-}
-
-constexpr bool check_id(const char* str) {
-    for (size_t i = 0; i < 7; i++) {
-        if (str[i] == '\0')
-            return i > 0;
-
-        if (!is_digit_or_letter(str[i]))
-            return false;
+namespace id_util {
+    constexpr bool is_digit_or_letter(const char c) {
+        return ('a' <= c && c <= 'z') ||
+               ('A' <= c && c <= 'Z') ||
+               ('0' <= c && c <= '9');
     }
 
-    return false;
+    constexpr uint64_t convert_char(char c) {
+        if ('A' <= c && c <= 'Z')
+            c = c - 'A' + 'a';
+        return c;
+    }
+
+    constexpr bool check_id(const char *str) {
+        for (size_t i = 0; i < 7; i++) {
+            if (str[i] == '\0')
+                return i > 0;
+
+            if (!id_util::is_digit_or_letter(str[i]))
+                return false;
+        }
+
+        return false;
+    }
 }
 
 constexpr Id_t Id(const char* str) {
     uint64_t hash_const = 79;
     uint64_t res = 0;
-    if(!check_id(str)) {
+    if(!id_util::check_id(str)) {
         throw "Invalid ID.";
     }
 
@@ -94,7 +96,7 @@ constexpr Id_t Id(const char* str) {
         if (str[i] == '\0')
             break;
 
-        res = res * hash_const + convert_char(str[i]);
+        res = res * hash_const + id_util::convert_char(str[i]);
     }
     return res;
 }
@@ -127,30 +129,32 @@ class Executors {
         }
 
         static constexpr void write(mem_t &mem, help_t &helper, value_t new_val) {
-            value_t id = executor<Arg>::value(mem, helper);
-            if (id < 0 || id >= (value_t) mem_size)
+            auto id = executor<Arg>::value(mem, helper);
+            if (id < 0 ||  (size_t) id >= mem_size)
                 throw "Out of borders";
+
             mem[id] = new_val;
         }
 
-        static constexpr value_t value(mem_t &mem, help_t &helper) {
-            value_t id = executor<Arg>::value(mem, helper);
-            if (id < 0 || id >= (value_t) mem_size)
+        static constexpr auto value(mem_t &mem, help_t &helper) {
+            auto id = executor<Arg>::value(mem, helper);
+            if (id < 0 || (size_t) id >= mem_size)
                 throw "Out of borders";
+
             return mem[id];
         }
     };
 
     template <auto val>
     struct executor <Num<val>> {
-        static constexpr value_t value(mem_t &, help_t &) {
+        static constexpr auto value(mem_t &, help_t &) {
             return val;
         }
     };
 
     template <Id_t id>
     struct executor<Lea<id>> {
-        static constexpr value_t value(mem_t &, help_t &helper) {
+        static constexpr auto value(mem_t &, help_t &helper) {
             for (size_t i = 0; i < mem_size; i++) {
                 if (id == helper[i])
                     return i;
@@ -355,8 +359,6 @@ class Executors {
                 executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
             }
             else {
-                if (it < last)
-                    throw("Infinite jumping.");
                 executor<Tail...>::execute(mem, helper, false, wanted_id, last, it + 1);
             }
         }
@@ -385,34 +387,28 @@ class Executors {
 
     template <size_t it, Id_t id, typename R, typename ... Tail>
     struct Declarations <it, D<id, R>, Tail...> {
-        static constexpr void declare(mem_t &mem, help_t &helper) {
-            if (it >= mem_size)
-                throw("Out of borders");
-
-            mem[it] = executor<R>::value(mem, helper);
-            helper[it] = id;
-            Declarations <it + 1, Tail...>::declare(mem, helper);
+        static constexpr void declare(mem_t &, help_t &) {
+            throw "Invalid declare syntax.";
         }
     };
 
-    /*
-    template <size_t it, Id_t id, value_t val, typename ... Tail>
+    template <size_t it, Id_t id, auto val, typename ... Tail>
     struct Declarations <it, D<id, Num<val>>, Tail...> {
         static constexpr void declare(mem_t &mem, help_t &helper) {
             if (it >= mem_size)
-                throw("Out of borders");
+                throw "Out of borders";
 
             mem[it] = executor<Num<val>>::value(mem, helper);
             helper[it] = id;
             Declarations <it + 1, Tail...>::declare(mem, helper);
         }
     };
-    */
+
 public:
     static constexpr mem_t execution() {
         mem_t mem {0};
         help_t helper {0};
-        Declarations<(uint64_t) 0, Rest...>::declare(mem, helper);
+        Declarations<0, Rest...>::declare(mem, helper);
         Id_t id_wanted = 0;
         size_t last = 0;
         size_t it = 0;
