@@ -113,8 +113,11 @@ class Executors {
         helper[mem_size] = (res == 0); // Pod indeksem mem_size jest flaga ZF.
     }
 
-    template <typename operation, typename... Tail>
-    struct executor {};
+    template <typename... Tail>
+    struct executor {
+        static constexpr void execute(mem_t &, help_t &,
+                                      bool, Id_t, size_t, size_t) {}
+    };
 
     template <typename Arg>
     struct executor <Mem<Arg>> {
@@ -125,33 +128,34 @@ class Executors {
 
         static constexpr void write(mem_t &mem, help_t &helper, value_t new_val) {
             value_t id = executor<Arg>::value(mem, helper);
-            if (id < 0 || id >= mem_size)
-                throw ""Out of borders"";
+            if (id < 0 || id >= (value_t) mem_size)
+                throw "Out of borders";
             mem[id] = new_val;
         }
 
         static constexpr value_t value(mem_t &mem, help_t &helper) {
             value_t id = executor<Arg>::value(mem, helper);
-            if (id < 0 || id >= mem_size)
-                throw ""Out of borders"";
+            if (id < 0 || id >= (value_t) mem_size)
+                throw "Out of borders";
             return mem[id];
         }
     };
 
-    template <int val>
+    template <auto val>
     struct executor <Num<val>> {
-        static constexpr value_t value(mem_t &mem, help_t &helper) {
+        static constexpr value_t value(mem_t &, help_t &) {
             return val;
         }
     };
 
     template <Id_t id>
     struct executor<Lea<id>> {
-        static constexpr value_t value(mem_t &mem, help_t &helper) {
+        static constexpr value_t value(mem_t &, help_t &helper) {
             for (size_t i = 0; i < mem_size; i++) {
                 if (id == helper[i])
                     return i;
             }
+            throw "Invalid id";
         }
     };
 
@@ -270,7 +274,6 @@ class Executors {
                 value_t res = executor<Arg>::value(mem, helper);
                 set_arth_flags(helper, res);
             }
-            else {
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
         }
@@ -286,7 +289,6 @@ class Executors {
                 value_t res = executor<Arg>::value(mem, helper);
                 set_arth_flags(helper, res);
             }
-            else {
 
             executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
         }
@@ -381,6 +383,19 @@ class Executors {
         }
     };
 
+    template <size_t it, Id_t id, typename R, typename ... Tail>
+    struct Declarations <it, D<id, R>, Tail...> {
+        static constexpr void declare(mem_t &mem, help_t &helper) {
+            if (it >= mem_size)
+                throw("Out of borders");
+
+            mem[it] = executor<R>::value(mem, helper);
+            helper[it] = id;
+            Declarations <it + 1, Tail...>::declare(mem, helper);
+        }
+    };
+
+    /*
     template <size_t it, Id_t id, value_t val, typename ... Tail>
     struct Declarations <it, D<id, Num<val>>, Tail...> {
         static constexpr void declare(mem_t &mem, help_t &helper) {
@@ -392,7 +407,7 @@ class Executors {
             Declarations <it + 1, Tail...>::declare(mem, helper);
         }
     };
-
+    */
 public:
     static constexpr mem_t execution() {
         mem_t mem {0};
