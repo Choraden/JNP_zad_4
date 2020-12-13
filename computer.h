@@ -1,63 +1,82 @@
 #ifndef COMPUTER_H
 #define COMPUTER_H
+
 #include <cstdlib>
 #include <array>
 
 using Id_t = uint64_t;
 
-template <typename... Args>
-struct Program {};
+template<typename... Args>
+struct Program {
+};
 
-template <Id_t id, typename Arg>
-struct  D {};
+template<Id_t id, typename Arg>
+struct D {
+};
 
-template <Id_t id>
-struct Lea {};
+template<Id_t id>
+struct Lea {
+};
 
-template <typename T>
-struct Mem {};
+template<typename T>
+struct Mem {
+};
 
-template <auto T>
-struct Num {};
+template<auto T>
+struct Num {
+};
 
-template <typename T>
-struct Inc {};
+template<typename T>
+struct Inc {
+};
 
-template <typename T>
-struct Dec {};
+template<typename T>
+struct Dec {
+};
 
-template <typename T>
-struct Not {};
+template<typename T>
+struct Not {
+};
 
-template <typename Arg1, typename Arg2>
-struct Add {};
+template<typename Arg1, typename Arg2>
+struct Add {
+};
 
-template <typename Arg1, typename Arg2>
-struct Sub {};
+template<typename Arg1, typename Arg2>
+struct Sub {
+};
 
-template <typename Arg1, typename Arg2>
-struct And {};
+template<typename Arg1, typename Arg2>
+struct And {
+};
 
-template <typename Arg1, typename Arg2>
-struct Or {};
+template<typename Arg1, typename Arg2>
+struct Or {
+};
 
-template <typename Arg1, typename Arg2>
-struct Mov {};
+template<typename Arg1, typename Arg2>
+struct Mov {
+};
 
-template <typename Arg1, typename Arg2>
-struct Cmp {};
+template<typename Arg1, typename Arg2>
+struct Cmp {
+};
 
-template <Id_t id>
-struct Label {};
+template<Id_t id>
+struct Label {
+};
 
-template <Id_t id>
-struct Jmp {};
+template<Id_t id>
+struct Jmp {
+};
 
-template <Id_t id>
-struct Jz {};
+template<Id_t id>
+struct Jz {
+};
 
-template <Id_t id>
-struct Js {};
+template<Id_t id>
+struct Js {
+};
 
 namespace id_util {
     constexpr bool is_digit_or_letter(const char c) {
@@ -85,10 +104,10 @@ namespace id_util {
     }
 }
 
-constexpr Id_t Id(const char* str) {
+constexpr Id_t Id(const char *str) {
     uint64_t hash_const = 79;
     uint64_t res = 0;
-    if(!id_util::check_id(str)) {
+    if (!id_util::check_id(str)) {
         throw "Invalid ID.";
     }
 
@@ -101,28 +120,27 @@ constexpr Id_t Id(const char* str) {
     return res;
 }
 
-template <typename value_t, size_t mem_size, typename... Rest>
+template<typename value_t, size_t mem_size, typename... Rest>
 class Executors {
     using mem_t = std::array<value_t, mem_size>;
     using help_t = std::array<uint64_t, mem_size + 2>;
 
-    constexpr static void set_arth_flags (help_t& helper, value_t res) {
+    constexpr static void set_arth_flags(help_t &helper, value_t res) {
         helper[mem_size] = (res == 0); // Pod indeksem mem_size jest flaga ZF.
         helper[mem_size + 1] = (res < 0); // Pod indeksem mem_size + 1 jest flaga SF.
     }
 
-    constexpr static void set_log_flags (help_t& helper, value_t res) {
+    constexpr static void set_log_flags(help_t &helper, value_t res) {
         helper[mem_size] = (res == 0); // Pod indeksem mem_size jest flaga ZF.
     }
 
-    template <typename... Tail>
+    template<typename... Tail>
     struct executor {
-        static constexpr void execute(mem_t &, help_t &,
-                                      bool, Id_t, size_t, size_t) {}
+        static constexpr void execute(mem_t &, help_t &, bool, Id_t) {}
     };
 
-    template <typename Arg>
-    struct executor <Mem<Arg>> {
+    template<typename Arg>
+    struct executor<Mem<Arg>> {
 
         static constexpr Id_t get_id(mem_t &mem, help_t &helper) {
             return executor<Arg>::value(mem, helper);
@@ -130,7 +148,7 @@ class Executors {
 
         static constexpr void write(mem_t &mem, help_t &helper, value_t new_val) {
             auto id = executor<Arg>::value(mem, helper);
-            if (id < 0 ||  (size_t) id >= mem_size)
+            if (id < 0 || (size_t) id >= mem_size)
                 throw "Out of borders";
 
             mem[id] = new_val;
@@ -145,14 +163,14 @@ class Executors {
         }
     };
 
-    template <auto val>
-    struct executor <Num<val>> {
+    template<auto val>
+    struct executor<Num<val>> {
         static constexpr auto value(mem_t &, help_t &) {
             return val;
         }
     };
 
-    template <Id_t id>
+    template<Id_t id>
     struct executor<Lea<id>> {
         static constexpr auto value(mem_t &, help_t &helper) {
             for (size_t i = 0; i < mem_size; i++) {
@@ -163,24 +181,25 @@ class Executors {
         }
     };
 
-    template <typename Arg1, typename Arg2, typename... Tail>
+    template<typename Arg1, typename Arg2, typename... Tail>
     struct executor<Add<Arg1, Arg2>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
             if (protection == false) {
-                executor<Arg1>::write(mem, helper, executor<Arg1>::value(mem, helper) + executor<Arg2>::value(mem, helper));
+                executor<Arg1>::write(mem, helper,
+                                      executor<Arg1>::value(mem, helper) + executor<Arg2>::value(mem, helper));
                 value_t res = executor<Arg1>::value(mem, helper);
                 set_arth_flags(helper, res);
             }
 
-            executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+            executor<Tail...>::execute(mem, helper, protection, wanted_id);
         }
     };
 
-    template <typename Arg1, typename Arg2, typename... Tail>
+    template<typename Arg1, typename Arg2, typename... Tail>
     struct executor<Sub<Arg1, Arg2>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
             if (protection == false) {
                 executor<Arg1>::write(mem, helper,
@@ -189,14 +208,14 @@ class Executors {
                 set_arth_flags(helper, res);
             }
 
-            executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+            executor<Tail...>::execute(mem, helper, protection, wanted_id);
         }
     };
 
-    template <typename Arg1, typename Arg2, typename... Tail>
+    template<typename Arg1, typename Arg2, typename... Tail>
     struct executor<And<Arg1, Arg2>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
             if (protection == false) {
                 executor<Arg1>::write(mem, helper,
@@ -205,14 +224,14 @@ class Executors {
                 set_log_flags(helper, res);
             }
 
-            executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+            executor<Tail...>::execute(mem, helper, protection, wanted_id);
         }
     };
 
-    template <typename Arg1, typename Arg2, typename... Tail>
+    template<typename Arg1, typename Arg2, typename... Tail>
     struct executor<Or<Arg1, Arg2>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
             if (protection == false) {
                 executor<Arg1>::write(mem, helper,
@@ -221,42 +240,42 @@ class Executors {
                 set_log_flags(helper, res);
             }
 
-            executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+            executor<Tail...>::execute(mem, helper, protection, wanted_id);
         }
     };
 
-    template <typename Arg1, typename Arg2, typename... Tail>
+    template<typename Arg1, typename Arg2, typename... Tail>
     struct executor<Mov<Arg1, Arg2>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
             if (protection == false) {
                 Id_t current_id = executor<Arg1>::get_id(mem, helper);
                 mem[current_id] = executor<Arg2>::value(mem, helper);
             }
 
-            executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+            executor<Tail...>::execute(mem, helper, protection, wanted_id);
         }
     };
 
-    template <typename Arg1, typename Arg2, typename... Tail>
+    template<typename Arg1, typename Arg2, typename... Tail>
     struct executor<Cmp<Arg1, Arg2>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
             if (protection == false) {
                 value_t res = executor<Arg1>::value(mem, helper) - executor<Arg2>::value(mem, helper);
                 set_arth_flags(helper, res);
             }
 
-            executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+            executor<Tail...>::execute(mem, helper, protection, wanted_id);
         }
     };
 
-    template <typename Arg, typename... Tail>
+    template<typename Arg, typename... Tail>
     struct executor<Not<Arg>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
             if (protection == false) {
                 executor<Arg>::write(mem, helper, !(executor<Arg>::value(mem, helper)));
@@ -264,14 +283,14 @@ class Executors {
                 set_log_flags(helper, res);
             }
 
-            executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+            executor<Tail...>::execute(mem, helper, protection, wanted_id);
         }
     };
 
-    template <typename Arg, typename... Tail>
+    template<typename Arg, typename... Tail>
     struct executor<Inc<Arg>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
             if (protection == false) {
                 executor<Arg>::write(mem, helper, executor<Arg>::value(mem, helper) + 1);
@@ -279,14 +298,14 @@ class Executors {
                 set_arth_flags(helper, res);
             }
 
-            executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+            executor<Tail...>::execute(mem, helper, protection, wanted_id);
         }
     };
 
-    template <typename Arg, typename... Tail>
+    template<typename Arg, typename... Tail>
     struct executor<Dec<Arg>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
             if (protection == false) {
                 executor<Arg>::write(mem, helper, executor<Arg>::value(mem, helper) - 1);
@@ -294,20 +313,19 @@ class Executors {
                 set_arth_flags(helper, res);
             }
 
-            executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+            executor<Tail...>::execute(mem, helper, protection, wanted_id);
         }
     };
 
     template<Id_t id, typename... Tail>
     struct executor<Jmp<id>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
             if (protection == false) {
-                executor<Rest...>::execute(mem, helper, true, id, it, 0);
-            }
-            else {
-                executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+                executor<Rest...>::execute(mem, helper, true, id);
+            } else {
+                executor<Tail...>::execute(mem, helper, protection, wanted_id);
             }
         }
     };
@@ -315,17 +333,16 @@ class Executors {
     template<Id_t id, typename... Tail>
     struct executor<Jz<id>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
+            /// mem_size - index flagi ZF.
             if (helper[mem_size] == 0) {
-                executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
-            }
-            else {
+                executor<Tail...>::execute(mem, helper, protection, wanted_id);
+            } else {
                 if (protection == false) {
-                    executor<Rest...>::execute(mem, helper, true, id, it, 0);
-                }
-                else {
-                    executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+                    executor<Rest...>::execute(mem, helper, true, id);
+                } else {
+                    executor<Tail...>::execute(mem, helper, protection, wanted_id);
                 }
             }
         }
@@ -334,17 +351,16 @@ class Executors {
     template<Id_t id, typename... Tail>
     struct executor<Js<id>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
+            /// mem_size + 1 - index flagi SF.
             if (helper[mem_size + 1] == 0) {
-                executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
-            }
-            else {
+                executor<Tail...>::execute(mem, helper, protection, wanted_id);
+            } else {
                 if (protection == false) {
-                    executor<Rest...>::execute(mem, helper, true, id, it, 0);
-                }
-                else {
-                    executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+                    executor<Rest...>::execute(mem, helper, true, id);
+                } else {
+                    executor<Tail...>::execute(mem, helper, protection, wanted_id);
                 }
             }
         }
@@ -353,13 +369,12 @@ class Executors {
     template<Id_t id, typename... Tail>
     struct executor<Label<id>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
             if (protection == false || (protection == true && id != wanted_id)) {
-                executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
-            }
-            else {
-                executor<Tail...>::execute(mem, helper, false, wanted_id, last, it + 1);
+                executor<Tail...>::execute(mem, helper, protection, wanted_id);
+            } else {
+                executor<Tail...>::execute(mem, helper, false, wanted_id);
             }
         }
     };
@@ -367,73 +382,72 @@ class Executors {
     template<Id_t id, typename N, typename... Tail>
     struct executor<D<id, N>, Tail...> {
         static constexpr void execute(mem_t &mem, help_t &helper,
-                                      bool protection, Id_t wanted_id, size_t last, size_t it) {
+                                      bool protection, Id_t wanted_id) {
 
-            executor<Tail...>::execute(mem, helper, protection, wanted_id, last, it + 1);
+            executor<Tail...>::execute(mem, helper, protection, wanted_id);
         }
     };
 
-    template <size_t it, typename ... Tail>
+    template<size_t it, typename ... Tail>
     struct Declarations {
-        static constexpr void declare(mem_t&, help_t &) {}
+        static constexpr void declare(mem_t &, help_t &) {}
     };
 
-    template <size_t it, typename R, typename ... Tail>
-    struct Declarations <it, R, Tail...> {
+    template<size_t it, typename R, typename ... Tail>
+    struct Declarations<it, R, Tail...> {
         static constexpr void declare(mem_t &mem, help_t &helper) {
-            Declarations <it, Tail...>::declare(mem, helper);
+            Declarations<it, Tail...>::declare(mem, helper);
         }
     };
 
-    template <size_t it, Id_t id, typename R, typename ... Tail>
-    struct Declarations <it, D<id, R>, Tail...> {
+    template<size_t it, Id_t id, typename R, typename ... Tail>
+    struct Declarations<it, D<id, R>, Tail...> {
         static constexpr void declare(mem_t &, help_t &) {
             throw "Invalid declare syntax.";
         }
     };
 
-    template <size_t it, Id_t id, auto val, typename ... Tail>
-    struct Declarations <it, D<id, Num<val>>, Tail...> {
+    template<size_t it, Id_t id, auto val, typename ... Tail>
+    struct Declarations<it, D<id, Num<val>>, Tail...> {
         static constexpr void declare(mem_t &mem, help_t &helper) {
             if (it >= mem_size)
                 throw "Out of borders";
 
             mem[it] = executor<Num<val>>::value(mem, helper);
             helper[it] = id;
-            Declarations <it + 1, Tail...>::declare(mem, helper);
+            Declarations<it + 1, Tail...>::declare(mem, helper);
         }
     };
 
 public:
     static constexpr mem_t execution() {
-        mem_t mem {0};
-        help_t helper {0};
+        mem_t mem{0};
+        help_t helper{0};
         Declarations<0, Rest...>::declare(mem, helper);
         Id_t id_wanted = 0;
-        size_t last = 0;
-        size_t it = 0;
-        executor<Rest...>::execute(mem, helper, false, id_wanted, last, it);
+        executor<Rest...>::execute(mem, helper, false, id_wanted);
 
         return mem;
     }
 };
 
-template <size_t mem_size, typename value_t>
+template<size_t mem_size, typename value_t>
 class Computer {
     using mem_t = std::array<value_t, mem_size>;
     using help_t = std::array<uint64_t, mem_size + 2>;
-    template <typename W>
-    struct Loading {};
+    template<typename W>
+    struct Loading {
+    };
 
-    template <typename ... List>
-    struct Loading <Program<List...>> {
+    template<typename ... List>
+    struct Loading<Program<List...>> {
         static constexpr mem_t start() {
             return Executors<value_t, mem_size, List...>::execution();
         }
     };
 
 public:
-    template <typename W>
+    template<typename W>
     static constexpr mem_t boot() {
         return Loading<W>::start();
     }
